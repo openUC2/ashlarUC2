@@ -18,6 +18,7 @@ requires = [
     'tifffile>=2023.3.15',
     'zarr>=2.11.3',
     'blessed>=1.17',
+    'imagecodecs>=2021.6.8',
 ]
 
 

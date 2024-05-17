@@ -68,7 +68,7 @@ class Metadata(object):
     @property
     def pixel_size(self):
         raise NotImplementedError
-
+    
     @property
     def pixel_dtype(self):
         raise NotImplementedError
@@ -391,6 +391,48 @@ class BioformatsMetadata(PlateMetadata):
             v = method(i).value
             values.append(v)
         return np.array(values, dtype=int)
+
+
+import numpy as np
+
+class NumpyReader(Reader):
+    def __init__(self, array, metadata):
+        self.array = array
+        self.metadata = metadata
+
+    def read(self, series, c):
+        return self.array[series, c, :, :]
+
+class NumpyMetadata(Metadata):
+    def __init__(self, array, positions, pixel_size):
+        self._positions = positions # list of (x, y) positions
+        self._array = array # numpy array
+        self.__num_images, self.__num_channels, self.__height, self.__width = array.shape
+        self.__pixel_size = pixel_size  # You can set this to the actual pixel size
+
+    @property
+    def _num_images(self):
+        return self.__num_images
+
+    @property
+    def num_channels(self):
+        return self.__num_channels
+
+    @property
+    def pixel_size(self):
+        return self.__pixel_size
+
+    @property
+    def pixel_dtype(self):
+        return self._array.dtype
+
+    def tile_position(self, i):
+        # Example positions, replace with actual positions
+        positions = np.array([[i * self.__width, j * self.__height] for i in range(int(np.sqrt(self.__num_images))) for j in range(int(np.sqrt(self.__num_images)))])
+        return positions[i]
+
+    def tile_size(self, i):
+        return np.array([self.__height, self.__width])
 
 
 class BioformatsReader(PlateReader):

@@ -4,12 +4,22 @@ import re
 import argparse
 import pathlib
 import blessed
-from .. import __version__ as VERSION
-from .. import reg
-from ..reg import PlateReader, BioformatsReader
-from ..filepattern import FilePatternReader
-from ..fileseries import FileSeriesReader
-from ..zen import ZenReader
+import os
+import numpy as np
+
+try:
+    from .. import __version__ as VERSION
+    from .. import reg
+    from ..reg import PlateReader, BioformatsReader, NumpyReader, NumpyMetadata
+    from ..filepattern import FilePatternReader
+    from ..fileseries import FileSeriesReader
+    from ..zen import ZenReader
+except:
+    from ashlar import __version__ as VERSION
+    from ashlar.reg import PlateReader, BioformatsReader, NumpyReader, NumpyMetadata
+    from ashlar.filepattern import FilePatternReader
+    from ashlar.fileseries import FileSeriesReader
+    from ashlar.zen import ZenReader
 
 
 def main(argv=sys.argv):
@@ -235,27 +245,26 @@ def main(argv=sys.argv):
 
 def process_single(
     filepaths, output_path_format, flip_x, flip_y, ffp_paths, dfp_paths,
-    barrel_correction, aligner_args, mosaic_args, pyramid, quiet,
-    plate_well=None
+    barrel_correction, aligner_args, mosaic_args, pyramid, quiet, plate_well=None, position_list=None, pixel_size=None
 ):
-
+    
     mosaic_args = mosaic_args.copy()
     writer_args = {}
     if pyramid:
         writer_args["tile_size"] = mosaic_args.pop("tile_size", None)
     mosaics = []
-    if barrel_correction:
-        mosaic_args["barrel_correction"] = barrel_correction
 
-    if not quiet:
-        print("Stitching and registering input images")
-        print('Cycle 0:')
-        print('    reading %s' % filepaths[0])
-    reader = build_reader(filepaths[0], barrel_correction, plate_well=plate_well)
+
+    if isinstance(filepaths[0], np.ndarray):
+        reader = build_numpy_reader(filepaths[0], position_list=position_list, pixel_size=pixel_size, plate_well=plate_well)
+    else:
+        if not quiet:
+            print("Stitching and registering input images")
+            print('Cycle 0:')
+            print('    reading %s' % filepaths[0])
+        reader = build_reader(filepaths[0], barrel_correction, plate_well=plate_well)
     process_axis_flip(reader, flip_x, flip_y)
     ea_args = aligner_args.copy()
-    for arg in ("alpha", "max_error"):
-        aligner_args.pop(arg, None)
     if len(filepaths) == 1:
         ea_args['do_make_thumbnail'] = False
     edge_aligner = reg.EdgeAligner(reader, **ea_args)
@@ -272,7 +281,10 @@ def process_single(
         if not quiet:
             print('Cycle %d:' % cycle)
             print('    reading %s' % filepath)
-        reader = build_reader(filepath, barrel_correction, plate_well=plate_well)
+        if isinstance(filepath, np.ndarray):
+            reader = build_numpy_reader(filepath, plate_well=plate_well)
+        else:
+            reader = build_reader(filepath, barrel_correction, plate_well=plate_well)
         process_axis_flip(reader, flip_x, flip_y)
         layer_aligner = reg.LayerAligner(reader, edge_aligner, **aligner_args)
         layer_aligner.run()
@@ -325,7 +337,7 @@ def process_plates(
                 process_single(
                     filepaths, mosaic_path_format, flip_x, flip_y,
                     ffp_paths, dfp_paths, barrel_correction, aligner_args,
-                    mosaic_args, pyramid, quiet, plate_well=(p, w)
+                    mosaic_args, pyramid, quiet, plate_well=(p, w), position_list=position_list, pixel_size=pixel_size
                 )
             else:
                 print("Skipping -- No images found.")
@@ -349,7 +361,13 @@ readers = {
     'fileseries': FileSeriesReader,
     'bioformats': BioformatsReader,
     'zen': ZenReader,
+    'numpy': NumpyReader,
 }
+
+
+def build_numpy_reader(array, position_list, pixel_size, plate_well=None):
+    metadata = NumpyMetadata(array, position_list, pixel_size)
+    return NumpyReader(array, metadata)
 
 # This is a short-term hack to provide a way to specify alternate reader
 # classes and pass specific args to them.
@@ -436,11 +454,164 @@ class HelpFormatter(argparse.HelpFormatter):
             if action.option_strings or action.nargs in defaulting_nargs:
                 help += " (default: %(default)s)"
         return help
-
-
 class ProcessingError(RuntimeError):
     pass
 
+def process_images(
+    filepaths,
+    output='ashlar_output.ome.tif',
+    align_channel=0,
+    flip_x=False,
+    flip_y=False,
+    flip_mosaic_x=False,
+    flip_mosaic_y=False,
+    output_channels=None,
+    maximum_shift=15,
+    stitch_alpha=0.01,
+    maximum_error=None,
+    filter_sigma=0,
+    filename_format='cycle_{cycle}_channel_{channel}.tif',
+    pyramid=False,
+    tile_size=1024,
+    ffp=None,
+    dfp=None,
+    barrel_correction=0,
+    plates=False,
+    quiet=False, 
+    position_list=None,
+    pixel_size=0.5
+):
+    configure_terminal()
+    configure_warning_format()
+    
+    # preapre positionlist if provided
+    if position_list is not None:
+        position_microns = np.fliplr(np.array(position_list, dtype=float)) # make it consistent with OMEReader (e.g. XY instead of YX)
+        # Invert Y so that stage position coordinates and image pixel
+        # coordinates are aligned (most formats seem to work this way).
+        position_microns *= [-1, 1]
+        position_list = position_microns / pixel_size
+
+    output_path = pathlib.Path(output)
+    op_tiff = bool(re.search(r"\.tiff?$", output_path.name, re.IGNORECASE))
+    ff_default = filename_format == 'cycle_{cycle}_channel_{channel}.tif'
+    if op_tiff and ff_default:
+        # Standard usage: -o includes a .tif filename, -f not included.
+        filename_format = output_path.name
+        output_path = output_path.parent
+    else:
+        # Old, deprecated usage: -o is a directory and/or -f was specified.
+        if ff_default:
+            warnings.warn(
+                "The output path must include a filename with a .tif or .tiff"
+                " suffix. Specifying only a directory path with -o/--output has"
+                " been deprecated and will be disabled in a future version. See"
+                " the -o documentation for details.",
+                reg.Warning,
+            )
+        else:
+            warnings.warn(
+                "The -f/--filename-format argument has been deprecated and its"
+                " functionality merged into the -o argument. See the -o"
+                " documentation for details.",
+                reg.Warning,
+            )
+        if op_tiff and not output_path.is_dir():
+            # Checking is_dir() avoids erroring out in the strange but legal
+            # situation where output_path is a DIRECTORY that ends in .tif !
+            print_error(
+                "Filename may be appended to the output path specified by"
+                " -o/--output, or specified separately with"
+                " -f/--filename-format, but not both at the same time"
+            )
+            return 1
+        if not re.search(r"\.tiff?$", filename_format, re.IGNORECASE):
+            print_error(
+                f"Filename format does not end in .tif: {filename_format}"
+            )
+            return 1
+    if not output_path.is_dir():
+        print_error(
+            "Output location does not exist or is not a directory:"
+            f" {output_path}"
+        )
+        return 1
+    if re.search(r"\.ome\.tiff?$", filename_format, re.IGNORECASE):
+        pyramid = True
+
+    if tile_size != 1024 and not pyramid:
+        print_error("--tile-size can only be used with OME-TIFF output")
+        return 1
+
+    ffp_paths = ffp
+    if ffp_paths:
+        if len(ffp_paths) not in (0, 1, len(filepaths)):
+            print_error(
+                "Wrong number of flat-field profiles. Must be 1, or {}"
+                " (number of input files)".format(len(filepaths))
+            )
+            return 1
+        if len(ffp_paths) == 1:
+            ffp_paths = ffp_paths * len(filepaths)
+
+    dfp_paths = dfp
+    if dfp_paths:
+        if len(dfp_paths) not in (0, 1, len(filepaths)):
+            print_error(
+                "Wrong number of dark-field profiles. Must be 1, or {}"
+                " (number of input files)".format(len(filepaths))
+            )
+            return 1
+        if len(dfp_paths) == 1:
+            dfp_paths = dfp_paths * len(filepaths)
+
+    aligner_args = {
+        'channel': align_channel,
+        'verbose': not quiet,
+        'max_shift': maximum_shift,
+        'alpha': stitch_alpha,
+        'max_error': maximum_error,
+        'filter_sigma': filter_sigma
+    }
+
+    mosaic_args = {
+        'flip_mosaic_x': flip_mosaic_x,
+        'flip_mosaic_y': flip_mosaic_y,
+        'verbose': not quiet
+    }
+    if output_channels:
+        mosaic_args['channels'] = output_channels
+    if pyramid:
+        mosaic_args['tile_size'] = tile_size
+
+    try:
+        if plates:
+            return process_plates(
+                filepaths, output_path, filename_format, flip_x,
+                flip_y, ffp_paths, dfp_paths, barrel_correction,
+                aligner_args, mosaic_args, pyramid, quiet, position_list=position_list, pixel_size=pixel_size
+            )
+        else:
+            mosaic_path_format = str(output_path / filename_format)
+            return process_single(
+                filepaths, mosaic_path_format, flip_x, flip_y,
+                ffp_paths, dfp_paths, barrel_correction, aligner_args,
+                mosaic_args, pyramid, quiet, position_list=position_list, pixel_size=pixel_size
+            )
+    except ProcessingError as e:
+        print_error(str(e))
+        return 1
 
 if __name__ == '__main__':
-    sys.exit(main())
+    import numpy as np
+
+    # Create example numpy arrays
+    num_images = 4
+    num_channels = 3
+    height, width = 256, 256
+    arrays = [np.random.rand(num_images, num_channels, height, width) for _ in range(2)]
+
+    # Process numpy arrays
+    process_images(arrays, 'output_path_format', 0, False, False, False, False, None, 15, 0.01, None, 0, False, 1024, None, None, 0, False, False)
+    #process_single(arrays, 'output_path_format', False, False, None, None, aligner_args, mosaic_args, False, False)
+
