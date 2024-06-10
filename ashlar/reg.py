@@ -37,19 +37,24 @@ if not jnius_config.vm_running:
     # possible working set without requiring the choice of a max heap size.
     jnius_config.add_options("-Xms10m", "-XX:+UseSerialGC")
 
-import jnius
+try:
+    # let's try to run without jnius
+    import jnius
 
-JBoolean = jnius.autoclass('java.lang.Boolean')
-DebugTools = jnius.autoclass('loci.common.DebugTools')
-IFormatReader = jnius.autoclass('loci.formats.IFormatReader')
-MetadataRetrieve = jnius.autoclass('ome.xml.meta.MetadataRetrieve')
-ServiceFactory = jnius.autoclass('loci.common.services.ServiceFactory')
-OMEXMLService = jnius.autoclass('loci.formats.services.OMEXMLService')
-ChannelSeparator = jnius.autoclass('loci.formats.ChannelSeparator')
-DynamicMetadataOptions = jnius.autoclass('loci.formats.in.DynamicMetadataOptions')
-UNITS = jnius.autoclass('ome.units.UNITS')
-DebugTools.enableLogging("ERROR")
-
+    JBoolean = jnius.autoclass('java.lang.Boolean')
+    DebugTools = jnius.autoclass('loci.common.DebugTools')
+    IFormatReader = jnius.autoclass('loci.formats.IFormatReader')
+    MetadataRetrieve = jnius.autoclass('ome.xml.meta.MetadataRetrieve')
+    ServiceFactory = jnius.autoclass('loci.common.services.ServiceFactory')
+    OMEXMLService = jnius.autoclass('loci.formats.services.OMEXMLService')
+    ChannelSeparator = jnius.autoclass('loci.formats.ChannelSeparator')
+    DynamicMetadataOptions = jnius.autoclass('loci.formats.in.DynamicMetadataOptions')
+    UNITS = jnius.autoclass('ome.units.UNITS')
+    DebugTools.enableLogging("ERROR")
+    IS_JNIUS = True
+except Exception as e:
+    print(e)
+    IS_JNIUS = False
 
 # TODO:
 # - Write tables with summary information about alignments.

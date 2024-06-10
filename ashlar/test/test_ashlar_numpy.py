@@ -8,7 +8,7 @@ arrays = [np.random.rand(num_images, num_channels, height, width)]
 # create a 2D list of xy positions 
 position_list = np.array(([0, 0], [0, 1], [1, 0], [1, 1]))*260.
 pixel_size = 0.5
-
+maximum_shift_microns = 50
 
 # Process numpy arrays
 process_images(filepaths=arrays,
