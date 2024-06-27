@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 from setuptools.command.develop import develop
 from setuptools.command.sdist import sdist
 from setuptools.command.build_py import build_py
-import versioneer
+
 
 from setuptools import setup, find_packages
 
@@ -17,11 +17,12 @@ def get_version():
         for line in file:
             if line.startswith('__version__'):
                 # Strip the line to remove whitespaces and newline characters,
-                # then split it on '=' and strip again to remove any remaining whitespaces.
-                # Finally, strip the quotes from the version string.
-                return line.strip().split('=')[1].strip().strip('\'"')
-    raise RuntimeError('Unable to find version string.')
-
+                # then split the string by '=' and take the second part,
+                # which is the version number. Finally, strip the quotes and any
+                # additional whitespace or newline characters around the version number.
+                version = line.strip().split('=')[1].strip().strip('\'"')
+                return version
+    raise RuntimeError("Version konnte nicht gefunden werden.")
 
 
 requires = [
@@ -117,7 +118,6 @@ setup(
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/x-rst',
-    cmdclass=versioneer.get_cmdclass(cmdclass),
     packages=find_packages(),
     include_package_data=True,
     install_requires=requires,
