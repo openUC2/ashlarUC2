@@ -34,12 +34,6 @@ jobs:
       with:
         repository: openUC2/ashlarUC2
         releases-only: true
-    - name: bump version
-      uses: jacobtomlinson/gha-find-replace@v2
-      with:
-        find: '__version__ = "v0.0.0"'
-        replace: '__version__ = "${{ steps.remote_chart.outputs.tag }}"'
-        regex: false
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
