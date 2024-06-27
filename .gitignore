@@ -2,7 +2,7 @@
 *.egg-info
 dist
 
-ashlar/jars
+ashlarUC2/jars
 
 *.tif
 *.rcpnl

@@ -1,5 +1,5 @@
 import numpy as np
-from ashlar.scripts.ashlar import process_images
+from ashlarUC2.scripts.ashlar import process_images
 # Create example numpy arrays
 num_images = 4
 num_channels = 2

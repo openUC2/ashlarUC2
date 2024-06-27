@@ -51,5 +51,5 @@ with tifffile.TiffWriter(collected_tiles_file) as tif:
         tif.write(image, metadata=metadata)
 
 print("Stitching tiles with ashlar..")
-from ashlar.scripts import ashlar
+from ashlarUC2.scripts import ashlar
 ashlar.main(['', collected_tiles_file, '-o', ashlar_output_file, '-m%s' % maximum_shift_microns]) # original

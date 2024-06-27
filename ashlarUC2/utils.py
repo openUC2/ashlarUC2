@@ -73,7 +73,7 @@ def nccw(img1, img2, sigma):
         diff = correlation - total_amplitude
         if diff <= 0:
             error = -np.log(correlation / total_amplitude)
-        elif diff < 1e-5:
+        elif diff < 2e-5:
             # This situation can occur due to numerical precision issues when
             # img1 and img2 are very nearly or exactly identical. If the
             # difference is small enough, let it slide.
@@ -145,7 +145,7 @@ def fourier_shift(img, shift):
 
 
 def paste(target, img, pos, func=None):
-    """Composite img into target."""
+    """Composite img into target. from ASHLAR"""
     pos = np.array(pos)
     # Bail out if destination region is out of bounds.
     if np.any(pos >= target.shape[:2]) or np.any(pos + img.shape[:2] < 0):
@@ -160,6 +160,14 @@ def paste(target, img, pos, func=None):
         img = img[:, -xi:]
         xi = 0
     target_slice = target[yi:yi+img.shape[0], xi:xi+img.shape[1]]
+    
+    def crop_like(img, target):
+        if (img.shape[0] > target.shape[0]):
+            img = img[:target.shape[0], :]
+        if (img.shape[1] > target.shape[1]):
+            img = img[:, :target.shape[1]]
+        return img
+    
     img = crop_like(img, target_slice)
     # Skip expensive sub-pixel shift if fractional position is zero.
     if pos_f.any():

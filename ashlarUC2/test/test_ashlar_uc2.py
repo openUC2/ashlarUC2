@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 import tifffile
 import numpy as np
-from ashlar.scripts.ashlar import process_images
+from ashlarUC2.scripts.ashlar import process_images
 # adjust to dataset:
 input_dir = "/Users/bene/Dropbox/File requests/Raster Anabel Marr/input/"
 #input_dir = r"C:\\Users\\T490\\Documents\\Anabel\\Bachelorarbeit\\Bilder\\Kontrastraster\\"
@@ -44,7 +44,7 @@ position_list = np.array(position_list) # has to be a list
 print("Stitching tiles with ashlar..")
 
 # Process numpy arrays
-process_images(filepaths=arrays,
+mImage = process_images(filepaths=arrays,
                 output='ashlar_output_numpy.tif',
                 align_channel=0,
                 flip_x=False,
@@ -66,5 +66,11 @@ process_images(filepaths=arrays,
                 quiet=False, 
                 position_list=position_list,
                 pixel_size=pixel_size)
-#process_single(arrays, 'output_path_format', False, False, None, None, aligner_args, mosaic_args, False, False)
+
+# check if data was read correctly
+import matplotlib.pyplot as plt
+import tifffile as tif
+plt.imshow(tif.imread('ashlar_output_numpy.tif'))
+plt.show()
+
 

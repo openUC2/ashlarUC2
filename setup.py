@@ -38,10 +38,10 @@ most common use cases as well as an API for building more specialized tools.
    tissue samples. See https://doi.org/10.1101/151738 for details.
 
 '''
-AUTHOR = 'Jeremy Muhlich'
-AUTHOR_EMAIL = 'jeremy_muhlich@hms.harvard.edu'
+AUTHOR = 'Jeremy Muhlich modified by Benedict Diederich'
+AUTHOR_EMAIL = 'benedictdied@gmail.com'
 LICENSE = 'MIT License'
-HOMEPAGE = 'https://github.com/sorgerlab/ashlar'
+HOMEPAGE = 'https://github.com/openuc2/ashlar'
 
 LOCI_TOOLS_URL = 'https://downloads.openmicroscopy.org/bio-formats/6.3.1/artifacts/loci_tools.jar'
 LOCI_TOOLS_SHA1 = 'bdf1a37b561fea02fd8d1c747bd34db3fc49667b'
@@ -49,7 +49,7 @@ LOCI_TOOLS_SHA1 = 'bdf1a37b561fea02fd8d1c747bd34db3fc49667b'
 def download_bioformats():
     print("Ensuring latest bioformats is present:")
     dist_root = os.path.abspath(os.path.dirname(__file__))
-    jar_dir = os.path.join(dist_root, 'ashlar', 'jars')
+    jar_dir = os.path.join(dist_root, 'ashlarUC2', 'jars')
     lt_jar_path = os.path.join(jar_dir, 'loci_tools.jar')
     if not os.access(jar_dir, os.F_OK):
         os.mkdir(jar_dir)
@@ -95,7 +95,7 @@ cmdclass = {
 }
 
 setup(
-    name='ashlar',
+    name='ashlarUC2',
     version=VERSION,
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
@@ -105,11 +105,6 @@ setup(
     include_package_data=True,
     install_requires=requires,
     entry_points={
-        'console_scripts': [
-            'ashlar=ashlar.scripts.ashlar:main',
-            'preview_slide=ashlar.scripts.preview_slide:main',
-            'make_alignment_movie=ashlar.scripts.make_alignment_movie:main'
-        ]
     },
     classifiers=[
         'Development Status :: 5 - Production/Stable',

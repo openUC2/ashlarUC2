@@ -15,11 +15,11 @@ try:
     from ..fileseries import FileSeriesReader
     from ..zen import ZenReader
 except:
-    from ashlar import __version__ as VERSION
-    from ashlar.reg import PlateReader, BioformatsReader, NumpyReader, NumpyMetadata
-    from ashlar.filepattern import FilePatternReader
-    from ashlar.fileseries import FileSeriesReader
-    from ashlar.zen import ZenReader
+    from ashlarUC2 import __version__ as VERSION
+    from ashlarUC2.reg import PlateReader, BioformatsReader, NumpyReader, NumpyMetadata
+    from ashlarUC2.filepattern import FilePatternReader
+    from ashlarUC2.fileseries import FileSeriesReader
+    from ashlarUC2.zen import ZenReader
 
 
 def main(argv=sys.argv):
