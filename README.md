@@ -1,3 +1,5 @@
+**ATTENTION:** This is a modified version used by UC2 and mirrored by PyPi to make it installable for ImSwitch. 
+
 # ASHLAR: Alignment by Simultaneous Harmonization of Layer/Adjacency Registration
 
 ## Whole-slide microscopy image stitching and registration in Python
