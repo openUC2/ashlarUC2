@@ -7,6 +7,23 @@ from setuptools.command.sdist import sdist
 from setuptools.command.build_py import build_py
 import versioneer
 
+from setuptools import setup, find_packages
+
+# Version will be read from your package's __init__.py
+# Make sure __version__ is defined in imswitch/__init__.py
+def get_version():
+    version_file = 'imswitch/__init__.py'
+    with open(version_file, 'r') as file:
+        for line in file:
+            if line.startswith('__version__'):
+                # Strip the line to remove whitespaces and newline characters,
+                # then split it on '=' and strip again to remove any remaining whitespaces.
+                # Finally, strip the quotes from the version string.
+                return line.strip().split('=')[1].strip().strip('\'"')
+    raise RuntimeError('Unable to find version string.')
+
+
+
 requires = [
     'numpy>=1.18.1',
     'pyjnius>=1.2.1',
@@ -20,8 +37,8 @@ requires = [
     'blessed>=1.17' #'imagecodecs>=2021.6.8',
 ]
 
-
-VERSION = versioneer.get_version()
+# get version from init file
+VERSION =  get_version()
 DESCRIPTION = ('Alignment by Simultaneous Harmonization of Layer/Adjacency '
                'Registration')
 LONG_DESCRIPTION='''
