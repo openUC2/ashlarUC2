@@ -12,7 +12,7 @@ from setuptools import setup, find_packages
 # Version will be read from your package's __init__.py
 # Make sure __version__ is defined in imswitch/__init__.py
 def get_version():
-    version_file = 'imswitch/__init__.py'
+    version_file = 'ashlarUC2/__init__.py'
     with open(version_file, 'r') as file:
         for line in file:
             if line.startswith('__version__'):
