@@ -3,7 +3,6 @@ import math
 import warnings
 import xml.etree.ElementTree
 import pathlib
-import jnius_config
 import numpy as np
 import scipy.spatial.distance
 import scipy.fft
@@ -25,39 +24,6 @@ from . import thumbnail
 from . import transform
 from . import __version__ as _version
 
-
-if not jnius_config.vm_running:
-    pkg_root = pathlib.Path(__file__).parent.resolve()
-    bf_jar_path = pkg_root / 'jars' / 'loci_tools.jar'
-    if not bf_jar_path.exists():
-        raise RuntimeError("loci_tools.jar missing from distribution"
-                           " (expected it at %s)" % bf_jar_path)
-    jnius_config.add_classpath(str(bf_jar_path))
-    # These settings constrain the memory used by BioFormats to near the minimum
-    # possible working set without requiring the choice of a max heap size.
-    jnius_config.add_options("-Xms10m", "-XX:+UseSerialGC")
-
-try:
-    # let's try to run without jnius
-    import jnius
-
-    JBoolean = jnius.autoclass('java.lang.Boolean')
-    DebugTools = jnius.autoclass('loci.common.DebugTools')
-    IFormatReader = jnius.autoclass('loci.formats.IFormatReader')
-    MetadataRetrieve = jnius.autoclass('ome.xml.meta.MetadataRetrieve')
-    ServiceFactory = jnius.autoclass('loci.common.services.ServiceFactory')
-    OMEXMLService = jnius.autoclass('loci.formats.services.OMEXMLService')
-    ChannelSeparator = jnius.autoclass('loci.formats.ChannelSeparator')
-    DynamicMetadataOptions = jnius.autoclass('loci.formats.in.DynamicMetadataOptions')
-    UNITS = jnius.autoclass('ome.units.UNITS')
-    DebugTools.enableLogging("ERROR")
-    IS_JNIUS = True
-except Exception as e:
-    print(e)
-    IS_JNIUS = False
-
-# TODO:
-# - Write tables with summary information about alignments.
 
 
 class Metadata(object):
@@ -201,203 +167,6 @@ class PlateReader(Reader):
     pass
 
 
-class BioformatsMetadata(PlateMetadata):
-
-    _pixel_dtypes = {
-        'uint8': np.dtype(np.uint8),
-        'uint16': np.dtype(np.uint16),
-    }
-
-    _ome_dtypes = {v: k for k, v in _pixel_dtypes.items()}
-
-    def __init__(self, path):
-        super(BioformatsMetadata, self).__init__()
-        self.path = path
-        self._init_metadata()
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        del state['_reader'], state['_metadata'], state['_omexml_root']
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self._init_metadata()
-
-    def _init_metadata(self):
-
-        factory = ServiceFactory()
-        service = jnius.cast(OMEXMLService, factory.getInstance(OMEXMLService))
-        metadata = service.createOMEXMLMetadata()
-        self._reader = ChannelSeparator()
-        self._reader.setMetadataStore(metadata)
-        self._reader.setFlattenedResolutions(False)
-        # For multi-scene .CZI files, we need raw tiles instead of the
-        # auto-stitched mosaic and we don't want labels or overview images
-        options = DynamicMetadataOptions()
-        options.setBoolean('zeissczi.autostitch', JBoolean(False))
-        options.setBoolean('zeissczi.attachments', JBoolean(False))
-        self._reader.setMetadataOptions(options)
-        self._reader.setId(self.path)
-
-        xml_content = service.getOMEXML(metadata)
-        self._metadata = jnius.cast(MetadataRetrieve, metadata)
-        self._omexml_root = xml.etree.ElementTree.fromstring(xml_content)
-        self.format_name = self._reader.getFormat()
-
-    @property
-    def _num_images(self):
-        count = self._metadata.imageCount
-        # Skip final overview slide in Metamorph Slide Scan data if present.
-        if (self.format_name == 'Metamorph STK'
-            and 'overview' in self._metadata.getImageName(count - 1).lower()):
-            count -= 1
-        return count
-
-    @property
-    def num_channels(self):
-        return self._metadata.getChannelCount(0)
-
-    @property
-    def num_plates(self):
-        return self._metadata.getPlateCount()
-
-    @property
-    def num_wells(self):
-        return [self._metadata.getWellCount(i) for i in range(self.num_plates)]
-
-    @property
-    def plate_well_series(self):
-        if not hasattr(self, '_plate_well_series'):
-            # FIXME Store slice objects to save resources where possible.
-            self._plate_well_series = [
-                [
-                    [
-                        self._metadata.getWellSampleIndex(p, w, s).value
-                        for s in range(self._metadata.getWellSampleCount(p, w))
-                    ]
-                    for w in range(num_wells)
-                ]
-                for p, num_wells in enumerate(self.num_wells)
-            ]
-        return self._plate_well_series
-
-    @property
-    def pixel_size(self):
-        values = []
-        for dim in ('Y', 'X'):
-            method = getattr(self._metadata, 'getPixelsPhysicalSize%s' % dim)
-            v_units = method(0)
-            if v_units is None:
-                warn_data(
-                    "Pixel size undefined; falling back to 1.0 \u03BCm."
-                )
-                value = 1.0
-            else:
-                value = v_units.value(UNITS.MICROMETER).doubleValue()
-            values.append(value)
-        values = tuple(values)
-        if not np.isclose(values[0], values[1], rtol=1e-4, atol=0):
-            raise Exception(f"Can't handle non-square pixels {values[::-1]}")
-        if values[0] != values[1]:
-            warn_data(
-                f"Pixel size is slightly non-square {values[::-1]}. Using"
-                f" {values[1]} for both dimensions."
-            )
-        return values[1]
-
-    @property
-    def pixel_dtype(self):
-        return self._pixel_dtypes[self._metadata.getPixelsType(0).value]
-
-    def plate_name(self, i):
-        return self._metadata.getPlateName(i)
-
-    @property
-    def well_naming(self):
-        if not hasattr(self, '_well_naming'):
-            _well_naming = []
-            for p in range(self.num_plates):
-                row_nc = self._metadata.getPlateRowNamingConvention(p)
-                column_nc = self._metadata.getPlateColumnNamingConvention(p)
-                if row_nc is not None:
-                    row_nc = row_nc.value
-                else:
-                    row_nc = 'letter'
-                if column_nc is not None:
-                    column_nc = column_nc.value
-                else:
-                    column_nc = 'number'
-                if row_nc not in ('letter', 'number') or column_nc != 'number':
-                    raise RuntimeError(
-                        "Can't handle well naming convention row={} column={}"
-                        .format(row_nc, column_nc)
-                    )
-                _well_naming.append([row_nc, column_nc])
-            self._well_naming = _well_naming
-        return self._well_naming
-
-    def well_name(self, plate, i):
-        row = self._metadata.getWellRow(plate, i).value
-        column = self._metadata.getWellColumn(plate, i).value
-        row_nc, column_nc = self.well_naming[plate]
-        # FIXME Support formatting with 384/1536-well plates.
-        assert row_nc in ('letter', 'number')
-        assert column_nc == 'number'
-        if row_nc == 'number':
-            row_fmt = '{:02}'.format(row + 1)
-        else:
-            row_fmt = chr(ord('A') + row)
-        column_fmt = '{:02}'.format(column + 1)
-        return row_fmt + column_fmt
-
-    def tile_position(self, i):
-        planeCount = self._metadata.getPlaneCount(i)
-        values = []
-        for dim in ('Y', 'X'):
-            method = getattr(self._metadata, 'getPlanePosition%s' % dim)
-            # FIXME verify all planes have the same X,Y position.
-            if planeCount > 0:
-                # Returns None if planePositionX/Y not defined.
-                v_units = method(i, 0)
-            else:
-                # Simple file formats don't have planes at all.
-                v_units = None
-            if v_units is None:
-                warn_data(
-                    "Stage coordinates undefined; falling back to (0, 0)."
-                )
-                values = [0.0, 0.0]
-                break
-            else:
-                v = v_units.value(UNITS.MICROMETER)
-                if v is None:
-                    # Conversion failed, which usually happens when the unit is
-                    # "reference frame". Proceed as if it's actually microns but
-                    # emit a warning.
-                    warn_data(
-                        "Stage coordinates' measurement unit is undefined;"
-                        " assuming \u03BCm."
-                    )
-                    v = v_units.value()
-                value = v.doubleValue()
-            values.append(value)
-        position_microns = np.array(values, dtype=float)
-        # Invert Y so that stage position coordinates and image pixel
-        # coordinates are aligned (most formats seem to work this way).
-        position_microns *= [-1, 1]
-        position_pixels = position_microns / self.pixel_size
-        return position_pixels
-
-    def tile_size(self, i):
-        values = []
-        for dim in ('Y', 'X'):
-            method = getattr(self._metadata, 'getPixelsSize%s' % dim)
-            v = method(i).value
-            values.append(v)
-        return np.array(values, dtype=int)
-
-
 import numpy as np
 
 class NumpyReader(Reader):
@@ -439,22 +208,6 @@ class NumpyMetadata(Metadata):
     def tile_size(self, i):
         return np.array([self.__height, self.__width])
 
-
-class BioformatsReader(PlateReader):
-
-    def __init__(self, path, plate=None, well=None):
-        self.path = path
-        self.metadata = BioformatsMetadata(self.path)
-        self.metadata.set_active_plate_well(plate, well)
-
-    def read(self, series, c):
-        self.metadata._reader.setSeries(self.metadata.active_series[series])
-        index = self.metadata._reader.getIndex(0, c, 0)
-        byte_array = self.metadata._reader.openBytes(index)
-        dtype = self.metadata.pixel_dtype
-        shape = self.metadata.tile_size(series)
-        img = np.frombuffer(byte_array.tostring(), dtype=dtype).reshape(shape)
-        return img
 
 
 class BarrelCorrectionReader(Reader):

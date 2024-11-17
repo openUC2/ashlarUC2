@@ -1,5 +1,8 @@
 import numpy as np
 from ashlarUC2.scripts.ashlar import process_images
+import tifffile as tif
+import matplotlib.pyplot as plt
+
 # Create example numpy arrays
 num_images = 4
 num_channels = 2
@@ -11,7 +14,7 @@ pixel_size = 0.5
 maximum_shift_microns = 50
 
 # Process numpy arrays
-process_images(filepaths=arrays,
+mImage = process_images(filepaths=arrays,
                 output='ashlar_output.tif',
                 align_channel=0,
                 flip_x=False,
@@ -33,5 +36,8 @@ process_images(filepaths=arrays,
                 quiet=False, 
                 position_list=position_list,
                 pixel_size=pixel_size)
+mImage = tif.imread('ashlar_output.tif')
+plt.imshow(mImage)
+plt.show()
 #process_single(arrays, 'output_path_format', False, False, None, None, aligner_args, mosaic_args, False, False)
 

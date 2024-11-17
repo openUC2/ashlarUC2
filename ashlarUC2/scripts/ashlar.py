@@ -10,13 +10,13 @@ import numpy as np
 try:
     from .. import __version__ as VERSION
     from .. import reg
-    from ..reg import PlateReader, BioformatsReader, NumpyReader, NumpyMetadata
+    from ..reg import PlateReader, NumpyReader, NumpyMetadata
     from ..filepattern import FilePatternReader
     from ..fileseries import FileSeriesReader
     from ..zen import ZenReader
 except:
     from ashlarUC2 import __version__ as VERSION
-    from ashlarUC2.reg import PlateReader, BioformatsReader, NumpyReader, NumpyMetadata
+    from ashlarUC2.reg import PlateReader, NumpyReader, NumpyMetadata
     from ashlarUC2.filepattern import FilePatternReader
     from ashlarUC2.fileseries import FileSeriesReader
     from ashlarUC2.zen import ZenReader
@@ -359,7 +359,6 @@ def process_axis_flip(reader, flip_x, flip_y):
 readers = {
     'filepattern': FilePatternReader,
     'fileseries': FileSeriesReader,
-    'bioformats': BioformatsReader,
     'zen': ZenReader,
     'numpy': NumpyReader,
 }

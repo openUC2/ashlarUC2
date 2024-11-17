@@ -27,7 +27,6 @@ def get_version():
 
 requires = [
     'numpy>=1.18.1',
-    'pyjnius>=1.2.1',
     'matplotlib>=3.1.2',
     'networkx>=2.4',
     'scipy>=1.4.1',
@@ -61,49 +60,17 @@ AUTHOR_EMAIL = 'benedictdied@gmail.com'
 LICENSE = 'MIT License'
 HOMEPAGE = 'https://github.com/openuc2/ashlar'
 
-LOCI_TOOLS_URL = 'https://downloads.openmicroscopy.org/bio-formats/6.3.1/artifacts/loci_tools.jar'
-LOCI_TOOLS_SHA1 = 'bdf1a37b561fea02fd8d1c747bd34db3fc49667b'
-
-def download_bioformats():
-    print("Ensuring latest bioformats is present:")
-    dist_root = os.path.abspath(os.path.dirname(__file__))
-    jar_dir = os.path.join(dist_root, 'ashlarUC2', 'jars')
-    lt_jar_path = os.path.join(jar_dir, 'loci_tools.jar')
-    if not os.access(jar_dir, os.F_OK):
-        os.mkdir(jar_dir)
-    try:
-        with open(lt_jar_path, 'rb') as f:
-            existing_sha1 = hashlib.sha1(f.read()).hexdigest()
-            if existing_sha1 == LOCI_TOOLS_SHA1:
-                print("    Up to date!")
-                return
-    except IOError:
-        pass
-    print("    Downloading BioFormats from %s ..." % LOCI_TOOLS_URL)
-    # FIXME add progress bar
-    content = urlopen(LOCI_TOOLS_URL).read()
-    content_sha1 = hashlib.sha1(content).hexdigest()
-    with open(lt_jar_path, 'wb') as f:
-        f.write(content)
-    if content_sha1 != LOCI_TOOLS_SHA1:
-        raise RuntimeError("loci_tools.jar hash mismatch")
-
-# Define some distutils command subclasses for a few key commands to trigger
-# downloading the BioFormats JAR before they run.
 
 class PreDevelop(develop):
     def run(self):
-        download_bioformats()
         develop.run(self)
 
 class PreSdist(sdist):
     def run(self):
-        download_bioformats()
         sdist.run(self)
 
 class PreBuildPy(build_py):
     def run(self):
-        download_bioformats()
         build_py.run(self)
 
 cmdclass = {
